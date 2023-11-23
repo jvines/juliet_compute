@@ -80,6 +80,83 @@ def mass(Ms, K, P, e, i, unit='jupiter'):
     return ret
 
 
+def get_A(mu, Ms):
+    return -2 * mu**3 * Ms - mu**6/3
+
+
+def get_B(mu, Ms):
+    return -(2 / 27 * mu ** 9 + 2 / 3 * 
+             mu ** 6 * Ms + mu ** 3 * Ms ** 2)
+
+
+def get_mu(K, e, i, P):
+
+    return K*(u.m / u.s) * np.sqrt(1 - e**2) / \
+           np.sin(i) * np.cbrt(P*u.d / 2 / np.pi / G)
+
+
+def get_x(mu, Ms):
+    """Cardano method solution."""
+    B = get_B(mu, Ms)
+    A = get_A(mu, Ms)
+    det = B ** 2 / 4 + A ** 3 / 27
+    u1 = -B / 2 + np.sqrt(det)
+    u2 = -B / 2 - np.sqrt(det)
+    return np.cbrt(u1) + np.cbrt(u2)
+
+
+def get_secondary(x, mu):
+    """The change in variable to depress the third degree equation."""
+    return x + mu ** 3 / 3
+
+
+def mass_binary(Ms, K, P, e, i):
+    """Solution to the secondary mass using the Cardano method.
+
+    The equation:
+
+    K = (2 * pi * G / P)^(1/3) * M2*sin(i)/(M1 + M2)^(2/3)*1/(1-e^2)^(1/2)
+
+    Can be rewritten as M2^3 - mu*Mp^2 - 2*mu^3*M1*M2-mu^3*M1^2 = 0
+    where mu absorbs all of the constants in the first equation.
+    As a third degree equation, it can be depressed by the change of variables:
+    M2 = x + mu^3/3
+    Where the equation is reduced to
+    x^3 + x(-2*mu^3*M1-mu^6/3) + (-2/27*mu^9-2/3*mu^6*M1-mu^3*M1^2)
+    Which is of the form
+    x^3 + Ax + B = 0
+    Where A = (-2*mu^3*M1 - mu^6/3); B = (-2/27*mu^9-2/3*mu^6*M1-mu^3*M1^2)
+    now we define the discriminant as B^2/4 + A^3/27 = D and then the solution
+    to the cubic equation, using Cardano's formula is
+    u1^(1/3) + u2^(1/3)
+    with u1 = -B/2 + D^(1/2) and u2 = -B/2 - D^(1/2)
+
+    Parameters
+    ----------
+    Ms: array_like
+        An array of floats containing the stellar mass in solar radii.
+    K: array_like
+        An array of floats containing the amplitude in m/s.
+    P: array_like
+        An array of floats containing the period in days.
+    e: array_like
+        An array of floats containing the eccentricity.
+    i: array_like
+        An array of floats containing the system inclination in degrees.
+
+    Returns
+    -------
+    ret: array_like
+        An array of floats containing the mass.
+    """
+    # First compute mu
+    mu = get_mu(K, e, i, P)
+    # Now transform to x
+    x = get_x(mu, Ms*u.solMass)
+    return get_secondary(x, mu)
+
+
+
 # RADIUS FUNCTIONS #
 
 def radius(Rs, p, unit='jupiter'):
@@ -288,7 +365,7 @@ def transit_duration(P, Rs, Rp, a, e, w):
     return dur
 
 
-def inclination(b, a):
+def inclination(b, a, e, w):
     """Calculate orbital inclination.
 
     Parameters
@@ -297,13 +374,17 @@ def inclination(b, a):
         An array of floats containing the impact parameter.
     a: array_like
         An array of floats containing the scaled semimajor axis.
+    e: array_like
+        An array of floats containing the eccentricity.
+    w: array_like
+        An array of floats containing the argument of periastron passage.
 
     Returns
     -------
     i: array_like
         An array of floats containing the inclination in radians.
     """
-    i = np.arccos(b / a)
+    i = np.arccos(b / a * (1 - e * np.sin(w)) / (1 - e ** 2))
     return i
 
 
