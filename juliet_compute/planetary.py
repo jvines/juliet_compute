@@ -256,7 +256,7 @@ def get_ew(s, c, parametrization='sesinw'):
         e = s ** 2 + c ** 2
     elif parametrization == 'esinw':
         e = (s ** 2 + c ** 2) ** .5
-    w = np.arccos(c / e ** .5)
+    w = np.arctan2(s, c)
     return e, w
 
 
